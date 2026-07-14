@@ -601,10 +601,7 @@ async function loadPeerCircles() {
         .join("")}
     </select>
 
-    <div id="circle-posts" style="margin-top:20px;"><p class="small">Loading…</p></div>
-
-    <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--border);" />
-    <form id="circle-post-form">
+    <form id="circle-post-form" style="margin-top:16px;">
       <label for="circle-post-name">Display name (shown to participants instead of your email)</label>
       <input type="text" id="circle-post-name" value="${localStorage.getItem("facilitatorDisplayName") ? escapeHtml(localStorage.getItem("facilitatorDisplayName")) : "Facilitator"}" placeholder="e.g. Facilitator, Coach Isaiah, ProAge Team" />
       <label for="circle-post-content">Reply to this circle</label>
@@ -612,6 +609,9 @@ async function loadPeerCircles() {
       <button type="submit">Post as Facilitator</button>
       <div id="circle-post-message"></div>
     </form>
+
+    <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--border);" />
+    <div id="circle-posts" class="posts-scroll"><p class="small">Loading…</p></div>
   `;
 
   document.getElementById("circle-select").addEventListener("change", (e) => {
@@ -677,7 +677,7 @@ async function renderCirclePosts() {
     .map(
       (p) => `
     <div class="post${p.is_facilitator_post ? " facilitator" : ""}">
-      <div class="meta"><strong>${escapeHtml(p.author_name)}</strong> · Week ${p.week_number ?? "-"} · ${new Date(p.created_at).toLocaleDateString()}</div>
+      <div class="meta"><strong>${escapeHtml(p.author_name)}</strong></div>
       <div class="content">${escapeHtml(p.content)}</div>
     </div>
   `

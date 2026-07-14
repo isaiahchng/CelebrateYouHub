@@ -29,14 +29,14 @@ async function init() {
   if (team) document.getElementById("team-title").textContent = `My Peer Circle — ${team.name}`;
 
   card.innerHTML = `
-    <div id="posts-list"><p class="small">Loading…</p></div>
-    <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--border);" />
     <form id="post-form">
       <label for="post-content">Share something with your circle</label>
       <textarea id="post-content" required placeholder="How did this week's challenge go? What are you working on?"></textarea>
       <button type="submit">Post to My Circle</button>
       <div id="post-message"></div>
     </form>
+    <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--border);" />
+    <div id="posts-list" class="posts-scroll"><p class="small">Loading…</p></div>
   `;
 
   document.getElementById("post-form").addEventListener("submit", async (e) => {
@@ -95,7 +95,7 @@ async function renderPosts() {
     .map(
       (p) => `
     <div class="post${p.is_facilitator_post ? " facilitator" : ""}">
-      <div class="meta"><strong>${escapeHtml(p.author_name)}</strong> · Week ${p.week_number ?? "-"} · ${new Date(p.created_at).toLocaleDateString()}</div>
+      <div class="meta"><strong>${escapeHtml(p.author_name)}</strong></div>
       <div class="content">${escapeHtml(p.content)}</div>
     </div>
   `

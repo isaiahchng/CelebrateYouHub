@@ -256,6 +256,11 @@ button:disabled {
 }
 
 /* ---------- Peer board ---------- */
+.posts-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
 .post {
   border-bottom: 1px solid var(--border);
   padding: 14px 0;
