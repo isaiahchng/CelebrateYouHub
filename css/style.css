@@ -274,6 +274,17 @@ button:disabled {
 .post .content {
   white-space: pre-line;
 }
+.post.facilitator {
+  background: var(--amber-light);
+  border: 1px solid var(--amber);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.post.facilitator .meta strong::after {
+  content: " · Facilitator";
+  color: var(--amber);
+  font-weight: 700;
+}
 
 /* ---------- Misc ---------- */
 .center {

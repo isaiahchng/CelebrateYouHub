@@ -94,7 +94,7 @@ async function renderPosts() {
   listEl.innerHTML = posts
     .map(
       (p) => `
-    <div class="post">
+    <div class="post${p.is_facilitator_post ? " facilitator" : ""}">
       <div class="meta"><strong>${escapeHtml(p.author_name)}</strong> · Week ${p.week_number ?? "-"} · ${new Date(p.created_at).toLocaleDateString()}</div>
       <div class="content">${escapeHtml(p.content)}</div>
     </div>

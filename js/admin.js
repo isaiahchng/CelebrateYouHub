@@ -24,6 +24,7 @@ async function init() {
   await loadQueue();
   await loadEngagement();
   await loadTeams();
+  await loadPeerCircles();
 }
 
 function switchTab(tab) {
@@ -31,6 +32,7 @@ function switchTab(tab) {
   document.getElementById("tab-queue").style.display = tab === "queue" ? "block" : "none";
   document.getElementById("tab-engagement").style.display = tab === "engagement" ? "block" : "none";
   document.getElementById("tab-teams").style.display = tab === "teams" ? "block" : "none";
+  document.getElementById("tab-circles").style.display = tab === "circles" ? "block" : "none";
 }
 
 // ---------------- Review Queue ----------------
@@ -570,6 +572,112 @@ async function loadTeams() {
       await loadEngagement();
     });
   });
+}
+
+// ---------------- Peer Circles ----------------
+
+let selectedCircleTeamId = null;
+
+async function loadPeerCircles() {
+  const el = document.getElementById("tab-circles");
+
+  const { data: teams } = await supabaseClient.from("teams").select("*, cohorts(name)").order("name");
+
+  if (!teams || teams.length === 0) {
+    el.innerHTML = `<p class="small">No peer circles yet — create one in the Batches &amp; Teams tab first.</p>`;
+    return;
+  }
+
+  if (!selectedCircleTeamId) selectedCircleTeamId = teams[0].id;
+
+  el.innerHTML = `
+    <label for="circle-select">Peer circle</label>
+    <select id="circle-select">
+      ${teams
+        .map(
+          (t) =>
+            `<option value="${t.id}" ${t.id === selectedCircleTeamId ? "selected" : ""}>${escapeHtml(t.name)}${t.cohorts ? " — " + escapeHtml(t.cohorts.name) : ""}</option>`
+        )
+        .join("")}
+    </select>
+
+    <div id="circle-posts" style="margin-top:20px;"><p class="small">Loading…</p></div>
+
+    <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--border);" />
+    <form id="circle-post-form">
+      <label for="circle-post-content">Reply to this circle as a facilitator</label>
+      <textarea id="circle-post-content" required placeholder="Answer a question, encourage the group, share a tip…"></textarea>
+      <button type="submit">Post as Facilitator</button>
+      <div id="circle-post-message"></div>
+    </form>
+  `;
+
+  document.getElementById("circle-select").addEventListener("change", (e) => {
+    selectedCircleTeamId = e.target.value;
+    renderCirclePosts();
+  });
+
+  document.getElementById("circle-post-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector("button[type=submit]");
+    const msgEl = document.getElementById("circle-post-message");
+    const content = document.getElementById("circle-post-content").value.trim();
+    if (!content) return;
+
+    btn.disabled = true;
+    btn.textContent = "Posting…";
+
+    const { error } = await supabaseClient.from("peer_posts").insert({
+      team_id: selectedCircleTeamId,
+      participant_id: profile.id,
+      author_name: profile.full_name || profile.email,
+      is_facilitator_post: true,
+      content,
+    });
+
+    btn.disabled = false;
+    btn.textContent = "Post as Facilitator";
+
+    if (error) {
+      msgEl.innerHTML = `<div class="msg error">${error.message}</div>`;
+      return;
+    }
+    document.getElementById("circle-post-content").value = "";
+    msgEl.innerHTML = "";
+    await renderCirclePosts();
+  });
+
+  await renderCirclePosts();
+}
+
+async function renderCirclePosts() {
+  const listEl = document.getElementById("circle-posts");
+  const { data: posts, error } = await supabaseClient
+    .from("peer_posts")
+    .select("*")
+    .eq("team_id", selectedCircleTeamId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    listEl.innerHTML = `<div class="msg error">Couldn't load posts: ${error.message}</div>`;
+    return;
+  }
+
+  if (!posts || posts.length === 0) {
+    listEl.innerHTML = `<p class="small">No posts in this circle yet.</p>`;
+    return;
+  }
+
+  listEl.innerHTML = posts
+    .map(
+      (p) => `
+    <div class="post${p.is_facilitator_post ? " facilitator" : ""}">
+      <div class="meta"><strong>${escapeHtml(p.author_name)}</strong> · Week ${p.week_number ?? "-"} · ${new Date(p.created_at).toLocaleDateString()}</div>
+      <div class="content">${escapeHtml(p.content)}</div>
+    </div>
+  `
+    )
+    .join("");
 }
 
 function escapeHtml(str) {

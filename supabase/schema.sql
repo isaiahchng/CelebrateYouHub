@@ -81,6 +81,7 @@ create table public.peer_posts (
   team_id uuid not null references public.teams (id) on delete cascade,
   participant_id uuid not null references public.profiles (id) on delete cascade,
   author_name text not null,   -- denormalised at insert time so teammates don't need read access to each other's profile row
+  is_facilitator_post boolean not null default false,  -- set only via admin write; lets participants tell a reply came from staff
   week_number int references public.weekly_content (week_number),
   content text not null,
   created_at timestamptz not null default now()
@@ -228,6 +229,7 @@ create policy "peer_posts: insert own team" on public.peer_posts
   for insert with check (
     participant_id = auth.uid()
     and team_id in (select team_id from public.profiles where id = auth.uid())
+    and is_facilitator_post is not true
   );
 create policy "peer_posts: admin write" on public.peer_posts
   for all using (public.is_admin()) with check (public.is_admin());
