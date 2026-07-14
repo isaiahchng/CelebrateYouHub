@@ -198,6 +198,27 @@ create policy "peer_posts: admin write" on public.peer_posts
   for all using (public.is_admin()) with check (public.is_admin());
 
 -- ============================================================
+-- PRE-INVITING PARTICIPANTS (assign a batch/team before first login)
+-- ============================================================
+
+-- Admin stages an invite here (email + batch + team) before the person has
+-- ever signed in. The signup trigger below consumes a matching row so their
+-- profile is created already assigned, instead of landing on an empty
+-- "not assigned yet" screen on their first login.
+create table public.invited_participants (
+  email text primary key,
+  full_name text,
+  cohort_id uuid references public.cohorts (id) on delete set null,
+  team_id uuid references public.teams (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.invited_participants enable row level security;
+
+create policy "invited_participants: admin only" on public.invited_participants
+  for all using (public.is_admin()) with check (public.is_admin());
+
+-- ============================================================
 -- AUTO-CREATE PROFILE ON SIGNUP
 -- ============================================================
 
@@ -207,9 +228,18 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  invite public.invited_participants%rowtype;
 begin
-  insert into public.profiles (id, email)
-  values (new.id, new.email);
+  select * into invite from public.invited_participants where email = new.email;
+
+  insert into public.profiles (id, email, full_name, cohort_id, team_id)
+  values (new.id, new.email, invite.full_name, invite.cohort_id, invite.team_id);
+
+  if invite.email is not null then
+    delete from public.invited_participants where email = invite.email;
+  end if;
+
   return new;
 end;
 $$;

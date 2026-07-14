@@ -122,12 +122,27 @@ tab:
    batches, each on its own timeline.
 2. **Create a peer circle** (team) per small group you want able to see each
    other's posts on the private team board.
-3. Have participants sign in once via magic link (creates their `profiles`
-   row automatically) — they'll then appear in the assignment table at the
-   bottom of the tab, where you set each person's batch and team.
+3. **Invite participants ahead of time**: enter their email (plus batch/team)
+   in the "Invite a participant" form *before* they've ever signed in. Their
+   account is created already assigned the moment they use their first magic
+   link — no empty "not assigned yet" screen. If someone already signed in
+   before you got to inviting them, the same form updates their existing
+   account instead.
 
 Running multiple classes concurrently just means multiple batches — each
 participant only ever sees their own batch's current week.
+
+### 9. Email deliverability — set up Custom SMTP before inviting real participants
+
+Supabase's built-in email sender is rate-limited to a handful of emails per
+hour and is only meant for testing. Before onboarding real participants:
+
+1. Sign up at a transactional email provider (e.g. [resend.com](https://resend.com),
+   free tier covers this scale) and verify your sending domain.
+2. In Supabase: **Authentication → Emails → SMTP Settings** → enable Custom
+   SMTP and fill in your provider's host/port/username/password and a sender
+   address on your verified domain.
+3. Save, then test a login.
 
 ---
 
@@ -161,6 +176,8 @@ supabase/seed_weekly_content.sql  Run once, after schema.sql
 supabase/migration_cohorts.sql  For a database that already had the old
                                  single-batch schema applied — adds the
                                  `cohorts` table without touching existing data
+supabase/migration_invites.sql  Adds pre-invite support (assign a batch/team
+                                 to an email before they've signed in)
 api/generate-feedback.js   Vercel function: drafts AI feedback on submission
 api/curriculumContext.js   Curriculum framework reference given to the AI
 ```

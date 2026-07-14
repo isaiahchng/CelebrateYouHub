@@ -221,11 +221,41 @@ async function loadEngagement() {
 async function loadTeams() {
   const el = document.getElementById("tab-teams");
 
-  const [{ data: teams }, { data: cohorts }, { data: participants }] = await Promise.all([
+  const [{ data: teams }, { data: cohorts }, { data: participants }, { data: invites }] = await Promise.all([
     supabaseClient.from("teams").select("*").order("name"),
     supabaseClient.from("cohorts").select("*").order("start_date", { ascending: false }),
     supabaseClient.from("profiles").select("*").eq("is_admin", false).order("full_name"),
+    supabaseClient.from("invited_participants").select("*").order("created_at", { ascending: false }),
   ]);
+
+  const cohortOptionsHtml = (selectedId) =>
+    (cohorts || [])
+      .map((c) => `<option value="${c.id}" ${selectedId === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`)
+      .join("");
+  const teamOptionsHtml = (selectedId) =>
+    (teams || [])
+      .map((t) => `<option value="${t.id}" ${selectedId === t.id ? "selected" : ""}>${escapeHtml(t.name)}</option>`)
+      .join("");
+
+  const cohortById = {};
+  (cohorts || []).forEach((c) => (cohortById[c.id] = c));
+  const teamById = {};
+  (teams || []).forEach((t) => (teamById[t.id] = t));
+
+  const inviteList = (invites || [])
+    .map(
+      (i) => `
+    <div class="post">
+      <div class="meta">
+        <strong>${escapeHtml(i.email)}</strong>${i.full_name ? " — " + escapeHtml(i.full_name) : ""}
+        — batch: ${i.cohort_id && cohortById[i.cohort_id] ? escapeHtml(cohortById[i.cohort_id].name) : "none"}
+        — team: ${i.team_id && teamById[i.team_id] ? escapeHtml(teamById[i.team_id].name) : "none"}
+      </div>
+      <button class="secondary" data-cancel-invite="${escapeHtml(i.email)}" style="margin-top:6px;">Cancel invite</button>
+    </div>
+  `
+    )
+    .join("");
 
   const cohortList = (cohorts || [])
     .map((c) => {
@@ -286,7 +316,38 @@ async function loadTeams() {
     .join("");
 
   el.innerHTML = `
-    <h3>Create a batch (cohort)</h3>
+    <h3>Invite a participant</h3>
+    <p class="small">Assign someone's batch/team before they ever sign in — their account is created already set up the first time they use their magic link, instead of landing on an empty screen.</p>
+    <form id="invite-form" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+      <div style="flex:1; min-width:200px;">
+        <label for="invite-email">Email</label>
+        <input type="email" id="invite-email" required placeholder="participant@example.com" />
+      </div>
+      <div style="flex:1; min-width:160px;">
+        <label for="invite-name">Full name (optional)</label>
+        <input type="text" id="invite-name" placeholder="Jane Tan" />
+      </div>
+      <div style="min-width:160px;">
+        <label for="invite-cohort">Batch</label>
+        <select id="invite-cohort">
+          <option value="">— None yet —</option>
+          ${cohortOptionsHtml(null)}
+        </select>
+      </div>
+      <div style="min-width:160px;">
+        <label for="invite-team">Team (optional)</label>
+        <select id="invite-team">
+          <option value="">— None yet —</option>
+          ${teamOptionsHtml(null)}
+        </select>
+      </div>
+      <button type="submit" style="margin-top:18px;">Invite</button>
+    </form>
+    <div id="invite-form-message"></div>
+
+    ${invites && invites.length ? `<h3 style="margin-top:20px;">Pending invites (not yet signed in)</h3>${inviteList}` : ""}
+
+    <h3 style="margin-top:28px;">Create a batch (cohort)</h3>
     <p class="small">Each batch has its own start date — participants in that batch see week 1 from that date, week 2 the following week, and so on.</p>
     <form id="new-cohort-form" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
       <div style="flex:1; min-width:180px;">
@@ -326,6 +387,62 @@ async function loadTeams() {
       </table>
     </div>
   `;
+
+  document.getElementById("invite-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msgEl = document.getElementById("invite-form-message");
+    const email = document.getElementById("invite-email").value.trim().toLowerCase();
+    const fullName = document.getElementById("invite-name").value.trim() || null;
+    const cohortId = document.getElementById("invite-cohort").value || null;
+    const teamId = document.getElementById("invite-team").value || null;
+    if (!email) return;
+
+    // If this person has already signed in once, update their existing
+    // profile directly — the invite table is only consumed on first signup.
+    const { data: existingProfile } = await supabaseClient
+      .from("profiles")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
+
+    let error;
+    if (existingProfile) {
+      ({ error } = await supabaseClient
+        .from("profiles")
+        .update({
+          full_name: fullName || undefined,
+          cohort_id: cohortId,
+          team_id: teamId,
+        })
+        .eq("id", existingProfile.id));
+    } else {
+      ({ error } = await supabaseClient
+        .from("invited_participants")
+        .upsert({ email, full_name: fullName, cohort_id: cohortId, team_id: teamId }));
+    }
+
+    if (error) {
+      msgEl.innerHTML = `<div class="msg error">${error.message}</div>`;
+      return;
+    }
+    msgEl.innerHTML = `<div class="msg success">${existingProfile ? "Existing participant updated." : "Invite saved — they'll be set up automatically on first sign-in."}</div>`;
+    await loadTeams();
+    await loadEngagement();
+  });
+
+  el.querySelectorAll("[data-cancel-invite]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const { error } = await supabaseClient
+        .from("invited_participants")
+        .delete()
+        .eq("email", btn.dataset.cancelInvite);
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      await loadTeams();
+    });
+  });
 
   document.getElementById("new-cohort-form").addEventListener("submit", async (e) => {
     e.preventDefault();
