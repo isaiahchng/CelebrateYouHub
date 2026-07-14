@@ -287,12 +287,29 @@ button:disabled {
   border-bottom: none;
 }
 .post .meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
   color: var(--ink-soft);
   margin-bottom: 4px;
 }
 .post .meta strong {
   color: var(--ink);
+}
+.week-tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary-dark);
+  background: var(--white);
+  border: 1px solid var(--primary-light);
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+}
+.time-ago {
+  font-size: 13px;
+  color: var(--ink-soft);
 }
 .post .content {
   white-space: pre-line;

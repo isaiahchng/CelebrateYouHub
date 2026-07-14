@@ -95,7 +95,7 @@ async function renderPosts() {
     .map(
       (p) => `
     <div class="post${p.is_facilitator_post ? " facilitator" : ""}">
-      <div class="meta"><strong>${escapeHtml(p.author_name)}</strong></div>
+      <div class="meta"><strong>${escapeHtml(p.author_name)}</strong>${p.week_number ? `<span class="week-tag">Week ${p.week_number}</span>` : ""}<span class="time-ago">${formatRelativeTime(p.created_at)}</span></div>
       <div class="content">${escapeHtml(p.content)}</div>
     </div>
   `

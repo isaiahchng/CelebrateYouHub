@@ -63,3 +63,18 @@ function getCurrentWeekNumber(startDateStr) {
   const week = Math.floor(diffDays / 7) + 1;
   return Math.min(8, Math.max(1, week));
 }
+
+// Short relative timestamp for peer circle posts, e.g. "2h ago", "3d ago".
+function formatRelativeTime(dateStr) {
+  const diffMs = new Date() - new Date(dateStr);
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 7) return `${diffDay}d ago`;
+  const diffWeek = Math.floor(diffDay / 7);
+  if (diffWeek < 5) return `${diffWeek}w ago`;
+  return new Date(dateStr).toLocaleDateString();
+}
