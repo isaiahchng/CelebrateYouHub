@@ -37,7 +37,11 @@ module.exports = async (req, res) => {
     ]);
 
     if (weekError || !week) {
-      res.status(404).json({ error: "Week content not found for week_number " + submission.week_number });
+      console.error("weekly_content lookup failed", weekError);
+      res.status(404).json({
+        error: "Week content not found for week_number " + submission.week_number,
+        detail: weekError ? weekError.message : "no row returned",
+      });
       return;
     }
 
