@@ -96,8 +96,11 @@ Write feedback for this participant and suggested next steps for the coming week
 `;
 
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-5",
-    max_tokens: 1024,
+    // Haiku is fast enough to reliably finish inside Supabase's webhook
+    // timeout window (max 10s) while still being well-suited to this
+    // structured, curriculum-grounded feedback task.
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 800,
     system: `You are drafting facilitator feedback for a participant in the "Celebrate You!" healthy longevity course's 8-week post-course nudge programme.\n${curriculumContext}`,
     messages: [{ role: "user", content: userContent }],
     tools: [
