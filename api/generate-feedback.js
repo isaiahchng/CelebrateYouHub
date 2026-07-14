@@ -11,7 +11,10 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const providedSecret = req.headers["x-webhook-secret"];
+  // Accept the shared secret either as a header (x-webhook-secret) or a
+  // ?secret= query param — Supabase's webhook UI doesn't always expose a
+  // custom-header field, so the query param is the simpler path to wire up.
+  const providedSecret = req.headers["x-webhook-secret"] || req.query.secret;
   if (!process.env.WEBHOOK_SECRET || providedSecret !== process.env.WEBHOOK_SECRET) {
     res.status(401).json({ error: "Unauthorized" });
     return;

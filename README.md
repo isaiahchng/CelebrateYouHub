@@ -82,10 +82,13 @@ any file in this repo.
 
 1. In Supabase, go to **Database → Webhooks → Create a new webhook**.
 2. Table: `submissions`. Events: `Insert` and `Update`.
-3. Type: **HTTP Request**, Method: **POST**, URL: your Vercel function URL from
-   step 4.
-4. Add an HTTP header: `x-webhook-secret` = the same `WEBHOOK_SECRET` value you
-   set in Vercel.
+3. Type: **HTTP Request**, Method: **POST**.
+4. URL: your Vercel function URL from step 4, with the shared secret as a
+   query param, e.g.:
+   `https://your-app.vercel.app/api/generate-feedback?secret=YOUR_WEBHOOK_SECRET`
+   (If your Supabase UI does expose a custom HTTP header field, you can use
+   that instead: header `x-webhook-secret` = your `WEBHOOK_SECRET` value. The
+   query param works either way and doesn't depend on that field existing.)
 5. Save. From now on, every time a participant submits or edits a reflection,
    Supabase will call your function and it'll drop an AI-drafted feedback item
    into the review queue.
