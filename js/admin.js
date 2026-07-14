@@ -23,12 +23,14 @@ async function init() {
 
   await loadQueue();
   await loadEngagement();
+  await loadTeams();
 }
 
 function switchTab(tab) {
   document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   document.getElementById("tab-queue").style.display = tab === "queue" ? "block" : "none";
   document.getElementById("tab-engagement").style.display = tab === "engagement" ? "block" : "none";
+  document.getElementById("tab-teams").style.display = tab === "teams" ? "block" : "none";
 }
 
 // ---------------- Review Queue ----------------
@@ -206,6 +208,110 @@ async function loadEngagement() {
       </table>
     </div>
   `;
+}
+
+// ---------------- Teams ----------------
+
+async function loadTeams() {
+  const el = document.getElementById("tab-teams");
+
+  const [{ data: teams }, { data: participants }] = await Promise.all([
+    supabaseClient.from("teams").select("*").order("name"),
+    supabaseClient.from("profiles").select("*").eq("is_admin", false).order("full_name"),
+  ]);
+
+  const teamList = (teams || [])
+    .map((t) => {
+      const count = (participants || []).filter((p) => p.team_id === t.id).length;
+      return `
+        <div class="post">
+          <div class="meta"><strong>${escapeHtml(t.name)}</strong> — ${count} participant${count === 1 ? "" : "s"}</div>
+          <button class="secondary" data-delete-team="${t.id}" style="margin-top:6px;">Delete team</button>
+        </div>
+      `;
+    })
+    .join("");
+
+  const participantRows = (participants || [])
+    .map(
+      (p) => `
+    <tr>
+      <td>${escapeHtml(p.full_name || "(no name set)")}</td>
+      <td>${escapeHtml(p.email)}</td>
+      <td>
+        <select data-participant-team="${p.id}">
+          <option value="">— Unassigned —</option>
+          ${(teams || [])
+            .map(
+              (t) => `<option value="${t.id}" ${p.team_id === t.id ? "selected" : ""}>${escapeHtml(t.name)}</option>`
+            )
+            .join("")}
+        </select>
+      </td>
+    </tr>
+  `
+    )
+    .join("");
+
+  el.innerHTML = `
+    <h3>Create a peer circle</h3>
+    <form id="new-team-form" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+      <div style="flex:1; min-width:200px;">
+        <label for="new-team-name">Team name</label>
+        <input type="text" id="new-team-name" required placeholder="e.g. Circle A" />
+      </div>
+      <button type="submit" style="margin-top:18px;">Create Team</button>
+    </form>
+    <div id="team-form-message"></div>
+
+    <h3 style="margin-top:28px;">Existing peer circles</h3>
+    ${teamList || `<p class="small">No teams yet — create one above.</p>`}
+
+    <h3 style="margin-top:28px;">Assign participants</h3>
+    <p class="small">Changing a participant's team saves immediately.</p>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Team</th></tr></thead>
+        <tbody>${participantRows || `<tr><td colspan="3" class="small">No participants yet — they'll appear here once they sign in once.</td></tr>`}</tbody>
+      </table>
+    </div>
+  `;
+
+  document.getElementById("new-team-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nameInput = document.getElementById("new-team-name");
+    const msgEl = document.getElementById("team-form-message");
+    const name = nameInput.value.trim();
+    if (!name) return;
+
+    const { error } = await supabaseClient.from("teams").insert({ name });
+    if (error) {
+      msgEl.innerHTML = `<div class="msg error">${error.message}</div>`;
+      return;
+    }
+    await loadTeams();
+  });
+
+  el.querySelectorAll("[data-delete-team]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this team? Members will become unassigned, not deleted.")) return;
+      const { error } = await supabaseClient.from("teams").delete().eq("id", btn.dataset.deleteTeam);
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      await loadTeams();
+    });
+  });
+
+  el.querySelectorAll("[data-participant-team]").forEach((select) => {
+    select.addEventListener("change", async () => {
+      const participantId = select.dataset.participantTeam;
+      const teamId = select.value || null;
+      const { error } = await supabaseClient.from("profiles").update({ team_id: teamId }).eq("id", participantId);
+      if (error) alert(error.message);
+    });
+  });
 }
 
 function escapeHtml(str) {
