@@ -605,7 +605,9 @@ async function loadPeerCircles() {
 
     <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--border);" />
     <form id="circle-post-form">
-      <label for="circle-post-content">Reply to this circle as a facilitator</label>
+      <label for="circle-post-name">Display name (shown to participants instead of your email)</label>
+      <input type="text" id="circle-post-name" value="${localStorage.getItem("facilitatorDisplayName") ? escapeHtml(localStorage.getItem("facilitatorDisplayName")) : "Facilitator"}" placeholder="e.g. Facilitator, Coach Isaiah, ProAge Team" />
+      <label for="circle-post-content">Reply to this circle</label>
       <textarea id="circle-post-content" required placeholder="Answer a question, encourage the group, share a tip…"></textarea>
       <button type="submit">Post as Facilitator</button>
       <div id="circle-post-message"></div>
@@ -622,7 +624,10 @@ async function loadPeerCircles() {
     const btn = e.target.querySelector("button[type=submit]");
     const msgEl = document.getElementById("circle-post-message");
     const content = document.getElementById("circle-post-content").value.trim();
+    const displayName = document.getElementById("circle-post-name").value.trim() || "Facilitator";
     if (!content) return;
+
+    localStorage.setItem("facilitatorDisplayName", displayName);
 
     btn.disabled = true;
     btn.textContent = "Posting…";
@@ -630,7 +635,7 @@ async function loadPeerCircles() {
     const { error } = await supabaseClient.from("peer_posts").insert({
       team_id: selectedCircleTeamId,
       participant_id: profile.id,
-      author_name: profile.full_name || profile.email,
+      author_name: displayName,
       is_facilitator_post: true,
       content,
     });
