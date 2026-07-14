@@ -453,13 +453,17 @@ function renderInviteSubtab(el) {
       options: { emailRedirectTo: window.location.origin + window.location.pathname.replace("admin.html", "") + "dashboard.html" },
     });
 
-    if (otpError) {
-      msgEl.innerHTML = `<div class="msg error">Saved, but couldn't send the login email: ${otpError.message}</div>`;
-    } else {
-      msgEl.innerHTML = `<div class="msg success">Invite email sent to ${email}. ${existingProfile ? "Their existing account was also updated." : ""}</div>`;
-    }
+    const resultHtml = otpError
+      ? `<div class="msg error">Saved, but couldn't send the login email: ${otpError.message}</div>`
+      : `<div class="msg success">Invite email sent to ${email}. ${existingProfile ? "Their existing account was also updated." : ""}</div>`;
+
+    // loadTeams() fully re-renders this sub-tab (its data just changed), which
+    // replaces #invite-form-message with a fresh empty one — so the message
+    // has to be re-applied to the new element afterwards, not just set now.
     await loadTeams();
     await loadEngagement();
+    const freshMsgEl = document.getElementById("invite-form-message");
+    if (freshMsgEl) freshMsgEl.innerHTML = resultHtml;
   });
 
   el.querySelectorAll("[data-cancel-invite]").forEach((btn) => {
