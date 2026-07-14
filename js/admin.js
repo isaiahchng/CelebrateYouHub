@@ -282,37 +282,79 @@ async function loadEngagement() {
 }
 
 // ---------------- Cohorts & Teams ----------------
+// Split into sub-tabs (Invite / Batches / Teams / Assign) since all four
+// stacked in one long scroll made the tab hard to use. Data is fetched
+// once per loadTeams() call and reused across whichever sub-tab is active.
+
+let teamsSubTab = "invite";
+let teamsData = { teams: [], cohorts: [], participants: [], invites: [] };
+let assignSearchTerm = "";
 
 async function loadTeams() {
-  const el = document.getElementById("tab-teams");
-
   const [{ data: teams }, { data: cohorts }, { data: participants }, { data: invites }] = await Promise.all([
     supabaseClient.from("teams").select("*").order("name"),
     supabaseClient.from("cohorts").select("*").order("start_date", { ascending: false }),
     supabaseClient.from("profiles").select("*").eq("is_admin", false).order("full_name"),
     supabaseClient.from("invited_participants").select("*").order("created_at", { ascending: false }),
   ]);
+  teamsData = { teams: teams || [], cohorts: cohorts || [], participants: participants || [], invites: invites || [] };
+  renderTeamsTab();
+}
 
-  const cohortOptionsHtml = (selectedId) =>
-    (cohorts || [])
-      .map((c) => `<option value="${c.id}" ${selectedId === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`)
-      .join("");
+function cohortOptionsHtml(selectedId) {
+  return teamsData.cohorts
+    .map((c) => `<option value="${c.id}" ${selectedId === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`)
+    .join("");
+}
 
-  // Teams with no cohort_id are legacy/unscoped and stay selectable from any
-  // batch; teams tied to a cohort only show up for participants in that
-  // same cohort (the database enforces this too — see validate_profile_team_cohort).
-  const teamsForCohort = (cohortId) => (teams || []).filter((t) => !t.cohort_id || t.cohort_id === cohortId);
-  const teamOptionsHtml = (selectedId, cohortId) =>
-    teamsForCohort(cohortId)
-      .map((t) => `<option value="${t.id}" ${selectedId === t.id ? "selected" : ""}>${escapeHtml(t.name)}</option>`)
-      .join("");
+// Teams with no cohort_id are legacy/unscoped and stay selectable from any
+// batch; teams tied to a cohort only show up for participants in that same
+// cohort (the database enforces this too — see validate_profile_team_cohort).
+function teamsForCohort(cohortId) {
+  return teamsData.teams.filter((t) => !t.cohort_id || t.cohort_id === cohortId);
+}
+function teamOptionsHtml(selectedId, cohortId) {
+  return teamsForCohort(cohortId)
+    .map((t) => `<option value="${t.id}" ${selectedId === t.id ? "selected" : ""}>${escapeHtml(t.name)}</option>`)
+    .join("");
+}
 
+function renderTeamsTab() {
+  const el = document.getElementById("tab-teams");
+  const { teams, cohorts, participants, invites } = teamsData;
+
+  el.innerHTML = `
+    <div class="subtabs">
+      <button class="subtab-btn ${teamsSubTab === "invite" ? "active" : ""}" data-subtab="invite">Invite${invites.length ? ` (${invites.length} pending)` : ""}</button>
+      <button class="subtab-btn ${teamsSubTab === "batches" ? "active" : ""}" data-subtab="batches">Batches (${cohorts.length})</button>
+      <button class="subtab-btn ${teamsSubTab === "teams" ? "active" : ""}" data-subtab="teams">Teams (${teams.length})</button>
+      <button class="subtab-btn ${teamsSubTab === "assign" ? "active" : ""}" data-subtab="assign">Assign (${participants.length})</button>
+    </div>
+    <div id="teams-subcontent"></div>
+  `;
+
+  el.querySelectorAll(".subtab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      teamsSubTab = btn.dataset.subtab;
+      renderTeamsTab();
+    });
+  });
+
+  const contentEl = document.getElementById("teams-subcontent");
+  if (teamsSubTab === "invite") renderInviteSubtab(contentEl);
+  else if (teamsSubTab === "batches") renderBatchesSubtab(contentEl);
+  else if (teamsSubTab === "teams") renderTeamsSubtab(contentEl);
+  else if (teamsSubTab === "assign") renderAssignSubtab(contentEl);
+}
+
+function renderInviteSubtab(el) {
+  const { cohorts, invites } = teamsData;
   const cohortById = {};
-  (cohorts || []).forEach((c) => (cohortById[c.id] = c));
+  cohorts.forEach((c) => (cohortById[c.id] = c));
   const teamById = {};
-  (teams || []).forEach((t) => (teamById[t.id] = t));
+  teamsData.teams.forEach((t) => (teamById[t.id] = t));
 
-  const inviteList = (invites || [])
+  const inviteList = invites
     .map(
       (i) => `
     <div class="post">
@@ -327,64 +369,8 @@ async function loadTeams() {
     )
     .join("");
 
-  const cohortList = (cohorts || [])
-    .map((c) => {
-      const count = (participants || []).filter((p) => p.cohort_id === c.id).length;
-      return `
-        <div class="post">
-          <div class="meta">
-            <strong>${escapeHtml(c.name)}</strong> — starts ${c.start_date} — ${count} participant${count === 1 ? "" : "s"}
-          </div>
-          <label style="margin-top:6px;">Start date</label>
-          <input type="date" value="${c.start_date}" data-cohort-date="${c.id}" style="max-width:200px;" />
-          <button class="secondary" data-delete-cohort="${c.id}" style="margin-top:6px;">Delete batch</button>
-        </div>
-      `;
-    })
-    .join("");
-
-  const teamList = (teams || [])
-    .map((t) => {
-      const count = (participants || []).filter((p) => p.team_id === t.id).length;
-      return `
-        <div class="post">
-          <div class="meta"><strong>${escapeHtml(t.name)}</strong> — ${count} participant${count === 1 ? "" : "s"}</div>
-          <label style="margin-top:6px;">Batch</label>
-          <select data-team-cohort="${t.id}" style="max-width:220px;">
-            <option value="">— Unscoped (any batch) —</option>
-            ${cohortOptionsHtml(t.cohort_id)}
-          </select>
-          <button class="secondary" data-delete-team="${t.id}" style="margin-top:6px;">Delete team</button>
-        </div>
-      `;
-    })
-    .join("");
-
-  const participantRows = (participants || [])
-    .map(
-      (p) => `
-    <tr>
-      <td>${escapeHtml(p.full_name || "(no name set)")}<br/><span class="small">${escapeHtml(p.email)}</span></td>
-      <td>
-        <select data-participant-cohort="${p.id}">
-          <option value="">— Unassigned —</option>
-          ${cohortOptionsHtml(p.cohort_id)}
-        </select>
-      </td>
-      <td>
-        <select data-participant-team="${p.id}">
-          <option value="">— Unassigned —</option>
-          ${teamOptionsHtml(p.team_id, p.cohort_id)}
-        </select>
-      </td>
-    </tr>
-  `
-    )
-    .join("");
-
   el.innerHTML = `
-    <h3>Invite a participant</h3>
-    <p class="small">Sends them a login link by email right away, with their batch/team already assigned — so their account is set up correctly the moment they click it, instead of landing on an empty screen.</p>
+    <p class="small">Sends a login link by email right away, with their batch/team already assigned — so their account is set up correctly the moment they click it, instead of landing on an empty screen.</p>
     <form id="invite-form" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
       <div style="flex:1; min-width:200px;">
         <label for="invite-email">Email</label>
@@ -412,55 +398,7 @@ async function loadTeams() {
     </form>
     <div id="invite-form-message"></div>
 
-    ${invites && invites.length ? `<h3 style="margin-top:20px;">Pending invites (not yet signed in)</h3>${inviteList}` : ""}
-
-    <h3 style="margin-top:28px;">Create a batch (cohort)</h3>
-    <p class="small">Each batch has its own start date — participants in that batch see week 1 from that date, week 2 the following week, and so on.</p>
-    <form id="new-cohort-form" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
-      <div style="flex:1; min-width:180px;">
-        <label for="new-cohort-name">Batch name</label>
-        <input type="text" id="new-cohort-name" required placeholder="e.g. July 2026 Batch" />
-      </div>
-      <div style="min-width:180px;">
-        <label for="new-cohort-date">Start date (Monday)</label>
-        <input type="date" id="new-cohort-date" required />
-      </div>
-      <button type="submit" style="margin-top:18px;">Create Batch</button>
-    </form>
-    <div id="cohort-form-message"></div>
-
-    <h3 style="margin-top:28px;">Existing batches</h3>
-    ${cohortList || `<p class="small">No batches yet — create one above.</p>`}
-
-    <h3 style="margin-top:28px;">Create a peer circle</h3>
-    <p class="small">A team belongs to one batch — only participants in that batch can be assigned to it.</p>
-    <form id="new-team-form" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
-      <div style="flex:1; min-width:200px;">
-        <label for="new-team-name">Team name</label>
-        <input type="text" id="new-team-name" required placeholder="e.g. Circle A" />
-      </div>
-      <div style="min-width:180px;">
-        <label for="new-team-cohort">Batch</label>
-        <select id="new-team-cohort" required>
-          <option value="" disabled selected>Choose a batch…</option>
-          ${cohortOptionsHtml(null)}
-        </select>
-      </div>
-      <button type="submit" style="margin-top:18px;">Create Team</button>
-    </form>
-    <div id="team-form-message"></div>
-
-    <h3 style="margin-top:28px;">Existing peer circles</h3>
-    ${teamList || `<p class="small">No teams yet — create one above.</p>`}
-
-    <h3 style="margin-top:28px;">Assign participants</h3>
-    <p class="small">Changing a participant's batch or team saves immediately.</p>
-    <div style="overflow-x:auto;">
-      <table>
-        <thead><tr><th>Participant</th><th>Batch</th><th>Team</th></tr></thead>
-        <tbody>${participantRows || `<tr><td colspan="3" class="small">No participants yet — they'll appear here once they sign in once.</td></tr>`}</tbody>
-      </table>
-    </div>
+    ${invites.length ? `<h3 style="margin-top:24px;">Pending invites (not yet signed in)</h3>${inviteList}` : ""}
   `;
 
   document.getElementById("invite-cohort").addEventListener("change", (e) => {
@@ -537,6 +475,46 @@ async function loadTeams() {
       await loadTeams();
     });
   });
+}
+
+function renderBatchesSubtab(el) {
+  const { cohorts, participants } = teamsData;
+
+  const cohortList = cohorts
+    .map((c) => {
+      const count = participants.filter((p) => p.cohort_id === c.id).length;
+      return `
+        <div class="post">
+          <div class="meta">
+            <strong>${escapeHtml(c.name)}</strong> — starts ${c.start_date} — ${count} participant${count === 1 ? "" : "s"}
+          </div>
+          <label style="margin-top:6px;">Start date</label>
+          <input type="date" value="${c.start_date}" data-cohort-date="${c.id}" style="max-width:200px;" />
+          <button class="secondary" data-delete-cohort="${c.id}" style="margin-top:6px;">Delete batch</button>
+        </div>
+      `;
+    })
+    .join("");
+
+  el.innerHTML = `
+    <h3>Create a batch (cohort)</h3>
+    <p class="small">Each batch has its own start date — participants in that batch see week 1 from that date, week 2 the following week, and so on.</p>
+    <form id="new-cohort-form" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+      <div style="flex:1; min-width:180px;">
+        <label for="new-cohort-name">Batch name</label>
+        <input type="text" id="new-cohort-name" required placeholder="e.g. July 2026 Batch" />
+      </div>
+      <div style="min-width:180px;">
+        <label for="new-cohort-date">Start date (Monday)</label>
+        <input type="date" id="new-cohort-date" required />
+      </div>
+      <button type="submit" style="margin-top:18px;">Create Batch</button>
+    </form>
+    <div id="cohort-form-message"></div>
+
+    <h3 style="margin-top:24px;">Existing batches</h3>
+    ${cohortList || `<p class="small">No batches yet — create one above.</p>`}
+  `;
 
   document.getElementById("new-cohort-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -552,6 +530,77 @@ async function loadTeams() {
     }
     await loadTeams();
   });
+
+  el.querySelectorAll("[data-delete-cohort]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this batch? Members will become unassigned, not deleted.")) return;
+      const { error } = await supabaseClient.from("cohorts").delete().eq("id", btn.dataset.deleteCohort);
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      await loadTeams();
+    });
+  });
+
+  el.querySelectorAll("[data-cohort-date]").forEach((input) => {
+    input.addEventListener("change", async () => {
+      const { error } = await supabaseClient
+        .from("cohorts")
+        .update({ start_date: input.value })
+        .eq("id", input.dataset.cohortDate);
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      await loadTeams();
+      await loadEngagement();
+    });
+  });
+}
+
+function renderTeamsSubtab(el) {
+  const { teams, participants } = teamsData;
+
+  const teamList = teams
+    .map((t) => {
+      const count = participants.filter((p) => p.team_id === t.id).length;
+      return `
+        <div class="post">
+          <div class="meta"><strong>${escapeHtml(t.name)}</strong> — ${count} participant${count === 1 ? "" : "s"}</div>
+          <label style="margin-top:6px;">Batch</label>
+          <select data-team-cohort="${t.id}" style="max-width:220px;">
+            <option value="">— Unscoped (any batch) —</option>
+            ${cohortOptionsHtml(t.cohort_id)}
+          </select>
+          <button class="secondary" data-delete-team="${t.id}" style="margin-top:6px;">Delete team</button>
+        </div>
+      `;
+    })
+    .join("");
+
+  el.innerHTML = `
+    <h3>Create a peer circle</h3>
+    <p class="small">A team belongs to one batch — only participants in that batch can be assigned to it.</p>
+    <form id="new-team-form" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+      <div style="flex:1; min-width:200px;">
+        <label for="new-team-name">Team name</label>
+        <input type="text" id="new-team-name" required placeholder="e.g. Circle A" />
+      </div>
+      <div style="min-width:180px;">
+        <label for="new-team-cohort">Batch</label>
+        <select id="new-team-cohort" required>
+          <option value="" disabled selected>Choose a batch…</option>
+          ${cohortOptionsHtml(null)}
+        </select>
+      </div>
+      <button type="submit" style="margin-top:18px;">Create Team</button>
+    </form>
+    <div id="team-form-message"></div>
+
+    <h3 style="margin-top:24px;">Existing peer circles</h3>
+    ${teamList || `<p class="small">No teams yet — create one above.</p>`}
+  `;
 
   document.getElementById("new-team-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -594,32 +643,58 @@ async function loadTeams() {
       await loadTeams();
     });
   });
+}
 
-  el.querySelectorAll("[data-delete-cohort]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      if (!confirm("Delete this batch? Members will become unassigned, not deleted.")) return;
-      const { error } = await supabaseClient.from("cohorts").delete().eq("id", btn.dataset.deleteCohort);
-      if (error) {
-        alert(error.message);
-        return;
-      }
-      await loadTeams();
-    });
-  });
+function renderAssignSubtab(el) {
+  const term = assignSearchTerm.trim().toLowerCase();
+  const filtered = teamsData.participants.filter(
+    (p) => !term || (p.full_name || "").toLowerCase().includes(term) || p.email.toLowerCase().includes(term)
+  );
 
-  el.querySelectorAll("[data-cohort-date]").forEach((input) => {
-    input.addEventListener("change", async () => {
-      const { error } = await supabaseClient
-        .from("cohorts")
-        .update({ start_date: input.value })
-        .eq("id", input.dataset.cohortDate);
-      if (error) {
-        alert(error.message);
-        return;
-      }
-      await loadTeams();
-      await loadEngagement();
-    });
+  const participantRows = filtered
+    .map(
+      (p) => `
+    <tr>
+      <td>${escapeHtml(p.full_name || "(no name set)")}<br/><span class="small">${escapeHtml(p.email)}</span></td>
+      <td>
+        <select data-participant-cohort="${p.id}">
+          <option value="">— Unassigned —</option>
+          ${cohortOptionsHtml(p.cohort_id)}
+        </select>
+      </td>
+      <td>
+        <select data-participant-team="${p.id}">
+          <option value="">— Unassigned —</option>
+          ${teamOptionsHtml(p.team_id, p.cohort_id)}
+        </select>
+      </td>
+    </tr>
+  `
+    )
+    .join("");
+
+  el.innerHTML = `
+    <p class="small">Changing a participant's batch or team saves immediately.</p>
+    <input type="text" id="assign-search" placeholder="Search by name or email…" value="${escapeHtml(assignSearchTerm)}" style="margin-bottom:14px;" />
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Participant</th><th>Batch</th><th>Team</th></tr></thead>
+        <tbody>${
+          participantRows ||
+          `<tr><td colspan="3" class="small">${teamsData.participants.length ? "No participants match that search." : "No participants yet — they'll appear here once they sign in once."}</td></tr>`
+        }</tbody>
+      </table>
+    </div>
+  `;
+
+  const searchInput = document.getElementById("assign-search");
+  searchInput.addEventListener("input", (e) => {
+    assignSearchTerm = e.target.value;
+    renderAssignSubtab(el);
+    // Re-focus and restore cursor position, since re-rendering replaces the input.
+    const newInput = document.getElementById("assign-search");
+    newInput.focus();
+    newInput.setSelectionRange(newInput.value.length, newInput.value.length);
   });
 
   el.querySelectorAll("[data-participant-team]").forEach((select) => {
