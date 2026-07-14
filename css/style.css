@@ -357,17 +357,12 @@ th {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   margin-top: 40px;
   padding: 20px 0 10px;
-  opacity: 0.65;
+  opacity: 0.8;
 }
 .site-footer img {
-  width: 22px;
-  height: 22px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-}
-.site-footer span {
-  font-size: 13px;
-  color: var(--ink-soft);
 }
