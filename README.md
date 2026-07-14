@@ -185,6 +185,8 @@ supabase/migration_team_cohort.sql  Ties each team to one batch and enforces
 supabase/migration_facilitator_posts.sql  Lets admins post into any peer
                                            circle, flagged so participants
                                            can tell it's from a facilitator
+supabase/migration_brief_content.sql  Updates the 8 weeks of nudge content
+                                       to the condensed "brief" wording
 api/generate-feedback.js   Vercel function: drafts AI feedback on submission
 api/curriculumContext.js   Curriculum framework reference given to the AI
 ```

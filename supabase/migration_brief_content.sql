@@ -1,7 +1,8 @@
--- Celebrate You Hub — 8-week nudge curriculum content
--- Run this AFTER schema.sql, once, in the Supabase SQL Editor.
--- Source: CY 8Week Brief Nudge Programme App.docx (2026 edition, condensed
--- "3-minute read" version). Safe to re-run — upserts by week_number.
+-- Updates the 8 weeks of nudge content on an already-deployed database to
+-- the condensed "3-minute read" version from CY 8Week Brief Nudge
+-- Programme App.docx, replacing the longer original wording. Upserts by
+-- week_number, so existing weekly_content rows are updated in place —
+-- participant submissions and feedback are untouched.
 
 insert into public.weekly_content (week_number, title, domain, insight, reflection_prompts, challenge, peer_circle_prompt) values
 
