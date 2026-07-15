@@ -133,8 +133,14 @@ function renderWeek(weekNumber) {
         <option value="not_started" ${!existing || existing.challenge_status === "not_started" ? "selected" : ""}>I haven't started yet</option>
       </select>
 
-      <label for="challenge-notes">Anything you want to note about the challenge? (optional)</label>
-      <textarea id="challenge-notes">${escapeHtml((existing && existing.challenge_notes) || "")}</textarea>
+      ${
+        week.week_number === 8
+          ? `
+      <label for="challenge-notes">Write your three things here — what you're proud of, your Keystone Habit, and who you'll share it with</label>
+      <textarea id="challenge-notes" ${existing ? "" : "required"}>${escapeHtml((existing && existing.challenge_notes) || "")}</textarea>
+      `
+          : ""
+      }
 
       <span class="section-label">👥 Peer Circle</span>
       <p class="challenge-text">${escapeHtml(week.peer_circle_prompt)}</p>
@@ -177,7 +183,7 @@ async function submitReflection(e, week) {
     week_number: week.week_number,
     reflection_answers: answers,
     challenge_status: document.getElementById("challenge-status").value,
-    challenge_notes: document.getElementById("challenge-notes").value.trim(),
+    challenge_notes: document.getElementById("challenge-notes")?.value.trim() || null,
     question_for_facilitator: document.getElementById("question-for-facilitator").value.trim(),
   };
 
