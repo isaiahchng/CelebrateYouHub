@@ -15,6 +15,8 @@
   --success-light: #e8f5e9;
   --error: #a13a2a;
   --error-light: #fbe6e2;
+  --info: #4a6fa5;
+  --info-light: #e9eff7;
   --radius: 14px;
   --radius-pill: 999px;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 6px 18px rgba(0, 0, 0, 0.05);
@@ -152,12 +154,16 @@ h3 {
 }
 
 .facilitator-question {
-  background: #f0f0f0;
+  background: var(--info-light);
   border-radius: 10px;
   padding: 16px 18px 18px;
   margin-top: 18px;
 }
 .facilitator-question textarea {
+  background: var(--white);
+}
+.facilitator-question .section-label {
+  color: var(--info);
   background: var(--white);
 }
 

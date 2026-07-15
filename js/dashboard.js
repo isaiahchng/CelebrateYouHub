@@ -146,7 +146,7 @@ function renderWeek(weekNumber) {
       <p class="challenge-text">${escapeHtml(week.peer_circle_prompt)}</p>
 
       <div class="facilitator-question">
-        <span class="section-label amber">❓ Ask Your Facilitator</span>
+        <span class="section-label">❓ Ask Your Facilitator</span>
         <p class="challenge-text">Optional — got a question about applying this to your own situation? Ask here.</p>
         <textarea id="question-for-facilitator" placeholder="e.g. How does this apply if I have a knee injury?">${escapeHtml((existing && existing.question_for_facilitator) || "")}</textarea>
       </div>
