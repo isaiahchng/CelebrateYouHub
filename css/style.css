@@ -151,6 +151,16 @@ h3 {
   background: #f0f0f0;
 }
 
+.facilitator-question {
+  background: #f0f0f0;
+  border-radius: 10px;
+  padding: 16px 18px 18px;
+  margin-top: 18px;
+}
+.facilitator-question textarea {
+  background: var(--white);
+}
+
 .insight-text,
 .challenge-text {
   white-space: pre-line;
